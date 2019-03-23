@@ -721,6 +721,7 @@ void transportProcessMessage(void)
 		// Check if sender requests an ack back.
 		if (mGetRequestAck(_msg)) {
 			TRANSPORT_DEBUG(PSTR("TSF:MSG:ACK REQ\n"));	// ACK requested
+			delay(5); //FIXME: Without this delay, high-speed microcontrollers (nrf52832, nrf52840) do not receive ACK acknowledgments. This is a temporary crutch.
 			_msgTmp = _msg;	// Copy message
 			mSetRequestAck(_msgTmp,
 			               false); // Reply without ack flag (otherwise we would end up in an eternal loop)
