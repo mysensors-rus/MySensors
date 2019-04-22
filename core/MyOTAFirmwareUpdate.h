@@ -80,7 +80,11 @@
 #define MY_OTA_RETRY_DELAY		(500u)				//!< Number of milliseconds before re-requesting a FW block
 #endif
 #ifndef MCUBOOT_PRESENT
+#ifndef MY_OTA_BLOCKS
 #define FIRMWARE_START_OFFSET	(10u)				//!< Start offset for firmware in flash (DualOptiboot wants to keeps a signature first)
+#else
+#define FIRMWARE_START_OFFSET	(12u)				//!< Start offset for firmware in flash (DualOptiboot wants to keeps a signature first)
+#endif
 #else
 #define	FIRMWARE_START_OFFSET	(FLASH_AREA_IMAGE_1_OFFSET_0)	//!< Use offset from generated_dts_board.h (mcuboot)
 #endif

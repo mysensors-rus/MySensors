@@ -36,6 +36,7 @@ SPIFlash _flash(MY_OTA_FLASH_SS, MY_OTA_FLASH_JDECID);
 #define _flash_readByte(addr)	_flash.readByte(addr)
 #define _flash_writeBytes( dstaddr, data, size) _flash.writeBytes( dstaddr, data, size)
 #define  _flash_blockErase32K(num)  _flash.blockErase32K(num)
+#define  _flash_blockErase64K(num)  _flash.blockErase64K(num)
 #define _flash_busy() _flash.busy()
 #else
 #define _flash_initialize()	true
@@ -103,10 +104,19 @@ LOCAL bool firmwareOTAUpdateProcess(void)
 				OTA_DEBUG(PSTR("!OTA:FWP:FLASH INIT FAIL\n"));	// failed to initialise flash
 				_firmwareUpdateOngoing = false;
 			} else {
+#ifndef MY_OTA_BLOCKS	// Support flash size > 32k
 				// erase lower 32K -> max flash size for ATMEGA328
 				_flash_blockErase32K(0);
 				// wait until flash erased
 				while ( _flash_busy() ) {}
+#else 
+				// erase 32K blocks
+				for (uint32_t i=0; i<MY_OTA_BLOCKS; i++) {
+				_flash_blockErase64K(i);
+				// wait until flash erased
+				while ( _flash_busy() ) {}
+				}
+#endif
 				_firmwareBlock = _nodeFirmwareConfig.blocks;
 				_firmwareUpdateOngoing = true;
 				// reset flags
@@ -264,10 +274,18 @@ LOCAL bool _firmwareResponse(uint16_t block, uint8_t *data)
 				hwWriteConfigBlock((void*)&_nodeFirmwareConfig, (void*)EEPROM_FIRMWARE_TYPE_ADDRESS,
 				                   sizeof(nodeFirmwareConfig_t));
 #ifndef MCUBOOT_PRESENT
+#ifndef MY_OTA_BLOCKS
 				// All seems ok, write size and signature to flash (DualOptiboot will pick this up and flash it)
 				const uint16_t firmwareSize = FIRMWARE_BLOCK_SIZE * _nodeFirmwareConfig.blocks;
 				const uint8_t OTAbuffer[FIRMWARE_START_OFFSET] = {'F','L','X','I','M','G',':', (uint8_t)(firmwareSize >> 8), (uint8_t)(firmwareSize & 0xff),':'};
 				_flash_writeBytes(0, OTAbuffer, FIRMWARE_START_OFFSET);
+#else
+				// All seems ok, write size and signature to flash (DualOptiboot will pick this up and flash it)
+				const uint32_t firmwareSize = FIRMWARE_BLOCK_SIZE * _nodeFirmwareConfig.blocks;
+				const uint8_t OTAbuffer[FIRMWARE_START_OFFSET] = {'F','L','X','I','M','G',':', (uint8_t)(firmwareSize >> 24), (uint8_t)(firmwareSize >> 16), (uint8_t)(firmwareSize >> 8), (uint8_t)(firmwareSize & 0xff),':'};
+				_flash_writeBytes(0, OTAbuffer, FIRMWARE_START_OFFSET);
+
+#endif //  MY_OTA_BLOCKS
 				// wait until flash ready
 				while (_flash_busy()) {}
 #endif
