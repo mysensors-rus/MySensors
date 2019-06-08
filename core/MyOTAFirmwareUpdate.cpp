@@ -76,7 +76,8 @@ LOCAL void firmwareOTAUpdateRequest(void)
 		firmwareRequest.type = _nodeFirmwareConfig.type;
 		firmwareRequest.version = _nodeFirmwareConfig.version;
 		firmwareRequest.block = (_firmwareBlock - 1);
-		OTA_DEBUG(PSTR("OTA:FRQ:FW REQ,T=%04" PRIX16 ",V=%04" PRIX16 ",B=%04" PRIX16 "\n"),
+		delayMicroseconds(500);		// For a stable result with OTA
+		 OTA_DEBUG(PSTR("OTA:FRQ:FW REQ,T=%04" PRIX16 ",V=%04" PRIX16 ",B=%04" PRIX16 "\n"),
 		          _nodeFirmwareConfig.type,
 		          _nodeFirmwareConfig.version, _firmwareBlock - 1); // request FW update block
 		(void)_sendRoute(build(_msgTmp, GATEWAY_ADDRESS, NODE_SENSOR_ID, C_STREAM, ST_FIRMWARE_REQUEST,
@@ -104,7 +105,7 @@ LOCAL bool firmwareOTAUpdateProcess(void)
 				OTA_DEBUG(PSTR("!OTA:FWP:FLASH INIT FAIL\n"));	// failed to initialise flash
 				_firmwareUpdateOngoing = false;
 			} else {
-#ifndef MY_OTA_BLOCKS	// Support flash size > 32k
+#ifndef MY_OTA_BLOCKS	// Support fw(flash) size > 32k
 				// erase lower 32K -> max flash size for ATMEGA328
 				_flash_blockErase32K(0);
 				// wait until flash erased
@@ -226,6 +227,8 @@ LOCAL bool transportIsValidFirmware(void)
 LOCAL bool _firmwareResponse(uint16_t block, uint8_t *data)
 {
 	if (_firmwareUpdateOngoing) {
+		// need
+		delayMicroseconds(500);		// For a stable result with OTA
 		OTA_DEBUG(PSTR("OTA:FWP:RECV B=%04" PRIX16 "\n"), block);	// received FW block
 		if (block != _firmwareBlock - 1) {
 			OTA_DEBUG(PSTR("!OTA:FWP:WRONG FWB\n"));	// received FW block
@@ -282,7 +285,7 @@ LOCAL bool _firmwareResponse(uint16_t block, uint8_t *data)
 #else
 				// All seems ok, write size and signature to flash (DualOptiboot will pick this up and flash it)
 				const uint32_t firmwareSize = FIRMWARE_BLOCK_SIZE * _nodeFirmwareConfig.blocks;
-				const uint8_t OTAbuffer[FIRMWARE_START_OFFSET] = {'F','L','X','I','M','G',':', (uint8_t)(firmwareSize >> 24), (uint8_t)(firmwareSize >> 16), (uint8_t)(firmwareSize >> 8), (uint8_t)(firmwareSize & 0xff),':'};
+				const uint8_t OTAbuffer[FIRMWARE_START_OFFSET] = {'M','Y','S','I','M','G',':', (uint8_t)(firmwareSize >> 24), (uint8_t)(firmwareSize >> 16), (uint8_t)(firmwareSize >> 8), (uint8_t)(firmwareSize & 0xff),':'};
 				_flash_writeBytes(0, OTAbuffer, FIRMWARE_START_OFFSET);
 
 #endif //  MY_OTA_BLOCKS
