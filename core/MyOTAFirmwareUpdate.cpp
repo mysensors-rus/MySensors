@@ -77,7 +77,7 @@ LOCAL void firmwareOTAUpdateRequest(void)
 		firmwareRequest.version = _nodeFirmwareConfig.version;
 		firmwareRequest.block = (_firmwareBlock - 1);
 		delayMicroseconds(500);		// For a stable result with OTA
-		OTA_DEBUG(PSTR("OTA:FRQ:FW REQ,T=%04" PRIX16 ",V=%04" PRIX16 ",B=%04" PRIX16 "\n"),
+		 OTA_DEBUG(PSTR("OTA:FRQ:FW REQ,T=%04" PRIX16 ",V=%04" PRIX16 ",B=%04" PRIX16 "\n"),
 		          _nodeFirmwareConfig.type,
 		          _nodeFirmwareConfig.version, _firmwareBlock - 1); // request FW update block
 		(void)_sendRoute(build(_msgTmp, GATEWAY_ADDRESS, NODE_SENSOR_ID, C_STREAM, ST_FIRMWARE_REQUEST,
