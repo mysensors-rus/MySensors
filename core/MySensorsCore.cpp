@@ -357,6 +357,10 @@ bool sendHeartbeat(const bool ack)
 bool present(const uint8_t childSensorId, const uint8_t sensorType, const char *description,
              const bool ack)
 {
+	#ifdef MY_PRESENT_DELAY
+		//delay(MY_PRESENT_DELAY);
+		wait(MY_PRESENT_DELAY);
+	#endif // MY_PRESENT_DELAY
 	return _sendRoute(build(_msgTmp, GATEWAY_ADDRESS, childSensorId, C_PRESENTATION, sensorType,
 	                        ack).set(childSensorId == NODE_SENSOR_ID ? MYSENSORS_LIBRARY_VERSION : description));
 }
