@@ -57,7 +57,7 @@ uint32_t *FlashClass::top_app_page_address()
 	// https://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v12.0.0%2Flib_bootloader.html
 	if (NRF_UICR->NRFFW[0]<0xFFFFFFFF) {
 		// Return pointer calculated by SoftDevice/bootloader
-		return (uint32_t *)NRF_UICR->NRFFW[0];
+		return 0; //(uint32_t *)NRF_UICR->NRFFW[0];
 	}
 #endif
 
