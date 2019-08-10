@@ -721,12 +721,12 @@ void transportProcessMessage(void)
 		// Check if sender requests an ack back.
 		if (mGetRequestAck(_msg)) {
 			TRANSPORT_DEBUG(PSTR("TSF:MSG:ACK REQ\n"));	// ACK requested
-			//FIXME: Without this delay, microcontrollers (nrf52832, nrf52840) do not receive ACK acknowledgments. This is a temporary crutch.
-			#if defined(MY_RADIO_NRF5_ESB) 
-				#ifndef MY_DEBUG
-					delay(5);
-				#endif
-			#endif			
+			//FIXME: Without this delay, microcontrollers (nrf52, stm32) do not receive ACK acknowledgments. This is a temporary crutch.
+			// #if defined(MY_RADIO_NRF5_ESB) || defined(ARDUINO_ARCH_STM32F1)
+			// 	#ifndef MY_DEBUG
+			// 		wait(5);
+			// 	#endif
+			// #endif			
 			_msgTmp = _msg;	// Copy message
 			mSetRequestAck(_msgTmp,
 			               false); // Reply without ack flag (otherwise we would end up in an eternal loop)
