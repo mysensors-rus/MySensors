@@ -27,6 +27,12 @@
 #define MyHwHAL_h
 
 /**
+* @def INVALID_INTERRUPT_NUM
+* @brief Invalid interrupt
+*/
+#define INVALID_INTERRUPT_NUM	(0xFFu)
+
+/**
 * @def MY_HWID_PADDING_BYTE
 * @brief HwID padding byte
 */
@@ -122,7 +128,17 @@ int8_t hwCPUTemperature(void);
 uint16_t hwFreeMem(void);
 
 #if defined(DEBUG_OUTPUT_ENABLED)
+/**
+ * Debug print
+ * @param fmt
+ */
 void hwDebugPrint(const char *fmt, ...);
+/**
+ * Convert buffer to hex string
+ * @param buf
+ * @param sz
+ */
+static void hwDebugBuf2Str(const uint8_t *buf, size_t sz) __attribute__((unused));
 #endif
 
 /**

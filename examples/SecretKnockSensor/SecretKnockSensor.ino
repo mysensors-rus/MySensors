@@ -181,8 +181,8 @@ void listenToSecretKnock()
 	}
 
 	int currentKnockNumber = 0;               // Position counter for the array.
-	int startTime = millis();                 // Reference for when this knock started.
-	int now = millis();
+	uint32_t startTime = millis();                 // Reference for when this knock started.
+	uint32_t now;
 
 	do {                                      // Listen for the next knock or wait for it to timeout.
 		knockSensorValue = digitalRead(knockSensor);
@@ -397,7 +397,7 @@ void chirp(int playTime, int delayTime)
 void receive(const MyMessage &message)
 {
 	// We only expect one type of message from controller. But we better check anyway.
-	if (message.type==V_LOCK_STATUS) {
+	if (message.getType()==V_LOCK_STATUS) {
 		// Change relay state
 		setLockState(message.getBool(), false);
 

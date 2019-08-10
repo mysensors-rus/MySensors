@@ -38,6 +38,7 @@
 #ifdef __cplusplus
 #include <Arduino.h>
 #endif
+#include <stdint.h>
 
 #include "MyConfig.h"
 #include "core/MyHelperFunctions.cpp"
@@ -382,6 +383,12 @@ MY_DEFAULT_RX_LED_PIN in your sketch instead to enable LEDs
 #include "hal/transport/RFM95/driver/RFM95.cpp"
 #include "hal/transport/RFM95/MyTransportRFM95.cpp"
 #endif
+
+#if (defined(MY_RF24_ENABLE_ENCRYPTION) && defined(MY_RADIO_RF24)) || (defined(MY_NRF5_ESB_ENABLE_ENCRYPTION) && defined(MY_RADIO_NRF5_ESB)) || (defined(MY_RFM69_ENABLE_ENCRYPTION) && defined(MY_RADIO_RFM69)) || (defined(MY_RFM95_ENABLE_ENCRYPTION) && defined(MY_RADIO_RFM95))
+#define MY_TRANSPORT_ENCRYPTION //!< ïnternal flag
+#endif
+
+#include "hal/transport/MyTransportHAL.cpp"
 
 // PASSIVE MODE
 #if defined(MY_PASSIVE_NODE) && !defined(DOXYGEN)

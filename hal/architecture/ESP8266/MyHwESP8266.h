@@ -22,6 +22,7 @@
 #include <SPI.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
+#include <EEPROM.h>
 
 #ifdef __cplusplus
 #include <Arduino.h>
@@ -48,6 +49,7 @@
 #define hwMillis() millis()
 // The use of randomSeed switch to pseudo random number. Keep hwRandomNumberInit empty
 #define hwRandomNumberInit()
+#define hwGetSleepRemaining() (0ul)
 
 bool hwInit(void);
 void hwReadConfigBlock(void *buf, void *addr, size_t length);

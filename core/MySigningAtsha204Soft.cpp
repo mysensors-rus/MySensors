@@ -36,18 +36,6 @@
 
 #if defined(MY_DEBUG_VERBOSE_SIGNING)
 #define SIGN_DEBUG(x,...) DEBUG_OUTPUT(x, ##__VA_ARGS__)
-static char printStr[65];
-static void buf2str(const uint8_t *buf, size_t sz)
-{
-	if (sz > 32) {
-		sz = 32; //clamp to 32 bytes
-	}
-	for (uint8_t i = 0; i < sz; i++) {
-		printStr[i * 2] = convertI2H(buf[i] >> 4);
-		printStr[(i * 2) + 1] = convertI2H(buf[i]);
-	}
-	printStr[sz * 2] = '\0';
-}
 #else
 #define SIGN_DEBUG(x,...)
 #endif
@@ -143,8 +131,8 @@ bool signerAtsha204SoftGetNonce(MyMessage &msg)
 	}
 
 #ifdef MY_HW_HAS_GETENTROPY
-	// Try to get MAX_PAYLOAD random bytes
-	while (hwGetentropy(&_signing_verifying_nonce, MAX_PAYLOAD) != MAX_PAYLOAD);
+	// Try to get MAX_PAYLOAD_SIZE random bytes
+	while (hwGetentropy(&_signing_verifying_nonce, MAX_PAYLOAD_SIZE) != MAX_PAYLOAD_SIZE);
 #else
 	// We used a basic whitening technique that XORs a random byte with the current hwMillis() counter
 	// and then the byte is hashed (SHA256) to produce the resulting nonce
@@ -155,13 +143,13 @@ bool signerAtsha204SoftGetNonce(MyMessage &msg)
 	SHA256(_signing_verifying_nonce, randBuffer, sizeof(randBuffer));
 #endif
 
-	if (MAX_PAYLOAD < 32) {
+	if (MAX_PAYLOAD_SIZE < 32) {
 		// We set the part of the 32-byte nonce that does not fit into a message to 0xAA
-		(void)memset((void *)&_signing_verifying_nonce[MAX_PAYLOAD], 0xAA, 32-MAX_PAYLOAD);
+		(void)memset((void *)&_signing_verifying_nonce[MAX_PAYLOAD_SIZE], 0xAA, 32u - MAX_PAYLOAD_SIZE);
 	}
 
 	// Transfer the first part of the nonce to the message
-	msg.set(_signing_verifying_nonce, MIN((uint8_t)MAX_PAYLOAD, (uint8_t)32));
+	msg.set(_signing_verifying_nonce, MIN((uint8_t)MAX_PAYLOAD_SIZE, (uint8_t)32));
 	_signing_verification_ongoing = true;
 	_signing_timestamp = hwMillis(); // Set timestamp to determine when to purge nonce
 	// Be a little fancy to handle turnover (prolong the time allowed to timeout after turnover)
@@ -178,38 +166,38 @@ void signerAtsha204SoftPutNonce(MyMessage &msg)
 	if (!_signing_init_ok) {
 		return;
 	}
-	(void)memcpy((void *)_signing_nonce, (const void *)msg.getCustom(), MIN((uint8_t)MAX_PAYLOAD,
+	(void)memcpy((void *)_signing_nonce, (const void *)msg.getCustom(), MIN((uint8_t)MAX_PAYLOAD_SIZE,
 	             (uint8_t)32));
-	if (MAX_PAYLOAD < 32) {
+	if (MAX_PAYLOAD_SIZE < 32) {
 		// We set the part of the 32-byte nonce that does not fit into a message to 0xAA
-		(void)memset((void *)&_signing_nonce[MAX_PAYLOAD], 0xAA, 32-MAX_PAYLOAD);
+		(void)memset((void *)&_signing_nonce[MAX_PAYLOAD_SIZE], 0xAA, 32u - MAX_PAYLOAD_SIZE);
 	}
 }
 
 bool signerAtsha204SoftSignMsg(MyMessage &msg)
 {
 	// If we cannot fit any signature in the message, refuse to sign it
-	if (mGetLength(msg) > MAX_PAYLOAD-2) {
-		SIGN_DEBUG(PSTR("!SGN:BND:SIG,SIZE,%" PRIu8 ">%" PRIu8 "\n"), mGetLength(msg),
-		           MAX_PAYLOAD-2); //Message too large
+	if (msg.getLength() > MAX_PAYLOAD_SIZE - 2u) {
+		SIGN_DEBUG(PSTR("!SGN:BND:SIG,SIZE,%" PRIu8 ">%" PRIu8 "\n"), msg.getLength(),
+		           MAX_PAYLOAD_SIZE - 2); //Message too large
 		return false;
 	}
 
 	// Calculate signature of message
-	mSetSigned(msg, 1); // make sure signing flag is set before signature is calculated
+	msg.setSigned(true); // make sure signing flag is set before signature is calculated
 	signerCalculateSignature(msg, true);
 
-	if (DO_WHITELIST(msg.destination)) {
+	if (DO_WHITELIST(msg.getDestination())) {
 		// Salt the signature with the senders nodeId and the (hopefully) unique serial The Creator has
 		// provided. We can reuse the nonce buffer now since it is no longer needed
 		(void)memcpy((void *)_signing_nonce, (const void *)_signing_hmac, 32);
-		_signing_nonce[32] = msg.sender;
+		_signing_nonce[32] = msg.getSender();
 		(void)memcpy((void *)&_signing_nonce[33], (const void *)_signing_node_serial_info, 9);
 		SHA256(_signing_hmac, _signing_nonce, 32+1+9);
-		SIGN_DEBUG(PSTR("SGN:BND:SIG WHI,ID=%" PRIu8 "\n"), msg.sender);
+		SIGN_DEBUG(PSTR("SGN:BND:SIG WHI,ID=%" PRIu8 "\n"), msg.getSender());
 #ifdef MY_DEBUG_VERBOSE_SIGNING
-		buf2str(_signing_node_serial_info, 9);
-		SIGN_DEBUG(PSTR("SGN:BND:SIG WHI,SERIAL=%s\n"), printStr);
+		hwDebugBuf2Str(_signing_node_serial_info, 9);
+		SIGN_DEBUG(PSTR("SGN:BND:SIG WHI,SERIAL=%s\n"), hwDebugPrintStr);
 #endif
 	}
 
@@ -217,8 +205,8 @@ bool signerAtsha204SoftSignMsg(MyMessage &msg)
 	_signing_hmac[0] = SIGNING_IDENTIFIER;
 
 	// Transfer as much signature data as the remaining space in the message permits
-	(void)memcpy((void *)&msg.data[mGetLength(msg)], (const void *)_signing_hmac,
-	             MIN((uint8_t)(MAX_PAYLOAD-mGetLength(msg)), (uint8_t)32));
+	(void)memcpy((void *)&msg.data[msg.getLength()], (const void *)_signing_hmac,
+	             MIN((uint8_t)(MAX_PAYLOAD_SIZE - msg.getLength()), (uint8_t)32));
 
 	return true;
 }
@@ -236,8 +224,8 @@ bool signerAtsha204SoftVerifyMsg(MyMessage &msg)
 
 		_signing_verification_ongoing = false;
 
-		if (msg.data[mGetLength(msg)] != SIGNING_IDENTIFIER) {
-			SIGN_DEBUG(PSTR("!SGN:BND:VER,IDENT=%" PRIu8 "\n"), msg.data[mGetLength(msg)]);
+		if (msg.data[msg.getLength()] != SIGNING_IDENTIFIER) {
+			SIGN_DEBUG(PSTR("!SGN:BND:VER,IDENT=%" PRIu8 "\n"), msg.data[msg.getLength()]);
 			return false;
 		}
 
@@ -247,22 +235,22 @@ bool signerAtsha204SoftVerifyMsg(MyMessage &msg)
 		// Look up the senders nodeId in our whitelist and salt the signature with that data
 		size_t j;
 		for (j = 0; j < NUM_OF(_signing_whitelist); j++) {
-			if (_signing_whitelist[j].nodeId == msg.sender) {
+			if (_signing_whitelist[j].nodeId == msg.getSender()) {
 				// We can reuse the nonce buffer now since it is no longer needed
 				(void)memcpy((void *)_signing_verifying_nonce, (const void *)_signing_hmac, 32);
-				_signing_verifying_nonce[32] = msg.sender;
+				_signing_verifying_nonce[32] = msg.getSender();
 				(void)memcpy((void *)&_signing_verifying_nonce[33], (const void *)_signing_whitelist[j].serial, 9);
 				SHA256(_signing_hmac, _signing_verifying_nonce, 32+1+9);
-				SIGN_DEBUG(PSTR("SGN:BND:VER WHI,ID=%" PRIu8 "\n"), msg.sender);
+				SIGN_DEBUG(PSTR("SGN:BND:VER WHI,ID=%" PRIu8 "\n"), msg.getSender());
 #ifdef MY_DEBUG_VERBOSE_SIGNING
-				buf2str(_signing_whitelist[j].serial, 9);
-				SIGN_DEBUG(PSTR("SGN:BND:VER WHI,SERIAL=%s\n"), printStr);
+				hwDebugBuf2Str(_signing_whitelist[j].serial, 9);
+				SIGN_DEBUG(PSTR("SGN:BND:VER WHI,SERIAL=%s\n"), hwDebugPrintStr);
 #endif
 				break;
 			}
 		}
 		if (j == NUM_OF(_signing_whitelist)) {
-			SIGN_DEBUG(PSTR("!SGN:BND:VER WHI,ID=%" PRIu8 " MISSING\n"), msg.sender);
+			SIGN_DEBUG(PSTR("!SGN:BND:VER WHI,ID=%" PRIu8 " MISSING\n"), msg.getSender());
 			return false;
 		}
 #endif
@@ -271,8 +259,8 @@ bool signerAtsha204SoftVerifyMsg(MyMessage &msg)
 		_signing_hmac[0] = SIGNING_IDENTIFIER;
 
 		// Compare the calculated signature with the provided signature
-		if (signerMemcmp(&msg.data[mGetLength(msg)], _signing_hmac,
-		                 MIN((uint8_t)(MAX_PAYLOAD-mGetLength(msg)), (uint8_t)32))) {
+		if (signerMemcmp(&msg.data[msg.getLength()], _signing_hmac,
+		                 MIN((uint8_t)(MAX_PAYLOAD_SIZE - msg.getLength()), (uint8_t)32))) {
 			return false;
 		} else {
 			return true;
@@ -284,13 +272,13 @@ bool signerAtsha204SoftVerifyMsg(MyMessage &msg)
 static void signerCalculateSignature(MyMessage &msg, const bool signing)
 {
 	// Signature is calculated on everything expect the first byte in the header
-	uint8_t bytes_left = mGetLength(msg)+HEADER_SIZE-1;
+	uint8_t bytes_left = msg.getLength()+HEADER_SIZE-1;
 	int16_t current_pos = 1-(int16_t)HEADER_SIZE; // Start at the second byte in the header
 	uint8_t* nonce = signing ? _signing_nonce : _signing_verifying_nonce;
 
 #ifdef MY_DEBUG_VERBOSE_SIGNING
-	buf2str(nonce, 32);
-	SIGN_DEBUG(PSTR("SGN:BND:NONCE=%s\n"), printStr);
+	hwDebugBuf2Str(nonce, 32);
+	SIGN_DEBUG(PSTR("SGN:BND:NONCE=%s\n"), hwDebugPrintStr);
 #endif
 
 	uint8_t _signing_temp_message[32];
@@ -314,8 +302,8 @@ static void signerCalculateSignature(MyMessage &msg, const bool signing)
 		}
 	}
 #ifdef MY_DEBUG_VERBOSE_SIGNING
-	buf2str(_signing_hmac, 32);
-	SIGN_DEBUG(PSTR("SGN:BND:HMAC=%s\n"), printStr);
+	hwDebugBuf2Str(_signing_hmac, 32);
+	SIGN_DEBUG(PSTR("SGN:BND:HMAC=%s\n"), hwDebugPrintStr);
 #endif
 }
 

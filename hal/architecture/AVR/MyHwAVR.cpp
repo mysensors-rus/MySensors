@@ -31,7 +31,6 @@ bool hwInit(void)
 }
 
 #define WDTO_SLEEP_FOREVER		(0xFFu)
-#define INVALID_INTERRUPT_NUM	(0xFFu)
 
 volatile uint8_t _wokeUpByInterrupt =
     INVALID_INTERRUPT_NUM;    // Interrupt number that woke the mcu.
@@ -39,6 +38,8 @@ volatile uint8_t _wakeUp1Interrupt  =
     INVALID_INTERRUPT_NUM;    // Interrupt number for wakeUp1-callback.
 volatile uint8_t _wakeUp2Interrupt  =
     INVALID_INTERRUPT_NUM;    // Interrupt number for wakeUp2-callback.
+
+static uint32_t sleepRemainingMs = 0ul;
 
 void wakeUp1(void)
 {
@@ -121,7 +122,7 @@ void hwPowerDown(const uint8_t wdto)
 	ADCSRA |= (1 << ADEN);
 }
 
-void hwInternalSleep(uint32_t ms)
+uint32_t hwInternalSleep(uint32_t ms)
 {
 	// Sleeping with watchdog only supports multiples of 16ms.
 	// Round up to next multiple of 16ms, to assure we sleep at least the
@@ -138,6 +139,10 @@ void hwInternalSleep(uint32_t ms)
 			}
 		}
 	}
+	if (interruptWakeUp()) {
+		return ms;
+	}
+	return 0ul;
 }
 
 int8_t hwSleep(uint32_t ms)
@@ -145,9 +150,10 @@ int8_t hwSleep(uint32_t ms)
 	// Return what woke the mcu.
 	// Default: no interrupt triggered, timer wake up
 	int8_t ret = MY_WAKE_UP_BY_TIMER;
+	sleepRemainingMs = 0ul;
 	if (ms > 0u) {
 		// sleep for defined time
-		hwInternalSleep(ms);
+		sleepRemainingMs = hwInternalSleep(ms);
 	} else {
 		// sleep until ext interrupt triggered
 		hwPowerDown(WDTO_SLEEP_FOREVER);
@@ -193,9 +199,10 @@ int8_t hwSleep(const uint8_t interrupt1, const uint8_t mode1, const uint8_t inte
 		attachInterrupt(interrupt2, wakeUp2, mode2);
 	}
 
+	sleepRemainingMs = 0ul;
 	if (ms > 0u) {
 		// sleep for defined time
-		hwInternalSleep(ms);
+		sleepRemainingMs = hwInternalSleep(ms);
 	} else {
 		// sleep until ext interrupt triggered
 		hwPowerDown(WDTO_SLEEP_FOREVER);
@@ -219,6 +226,11 @@ int8_t hwSleep(const uint8_t interrupt1, const uint8_t mode1, const uint8_t inte
 	_wokeUpByInterrupt = INVALID_INTERRUPT_NUM;
 
 	return ret;
+}
+
+uint32_t hwGetSleepRemaining(void)
+{
+	return sleepRemainingMs;
 }
 
 inline void hwRandomNumberInit(void)
@@ -324,12 +336,13 @@ uint16_t hwCPUFrequency(void)
 	WDTCSR |= (1 << WDCE) | (1 << WDE);
 	WDTCSR = WDTsave;
 	sei();
+	const uint16_t result = TCNT1 * 2048UL / 100000UL;
 	// restore timer settings
 	TCCR1A = TCCR1Asave;
 	TCCR1B = TCCR1Bsave;
 	TCCR1C = TCCR1Csave;
 	// return frequency in 1/10MHz (accuracy +- 10%)
-	return TCNT1 * 2048UL / 100000UL;
+	return result;
 }
 
 int8_t hwCPUTemperature(void)

@@ -24,114 +24,112 @@
 #include <string.h>
 
 char _fmtBuffer[MY_GATEWAY_MAX_SEND_LENGTH];
-char _convBuffer[MAX_PAYLOAD * 2 + 1];
+char _convBuffer[MAX_PAYLOAD_SIZE * 2 + 1];
 
 bool protocolSerial2MyMessage(MyMessage &message, char *inputString)
 {
 	char *str, *p;
 	uint8_t index = 0;
-	uint8_t command = 0;
-	message.sender = GATEWAY_ADDRESS;
-	message.last = GATEWAY_ADDRESS;
-	mSetAck(message, false);
+	mysensors_command_t command = C_INVALID_7;
+	message.setSender(GATEWAY_ADDRESS);
+	message.setLast(GATEWAY_ADDRESS);
+	message.setEcho(false);
 
 	// Extract command data coming on serial line
 	for (str = strtok_r(inputString, ";", &p); // split using semicolon
-	        str && index < 6; // loop while str is not null an max 5 times
-	        str = strtok_r(NULL, ";", &p) // get subsequent tokens
+	        str && index < 5; // loop while str is not null an max 4 times
+	        str = strtok_r(NULL, ";", &p), index++ // get subsequent tokens
 	    ) {
 		switch (index) {
 		case 0: // Radio id (destination)
-			message.destination = atoi(str);
+			message.setDestination(atoi(str));
 			break;
 		case 1: // Child id
-			message.sensor = atoi(str);
+			message.setSensor(atoi(str));
 			break;
 		case 2: // Message type
-			command = atoi(str);
-			mSetCommand(message, command);
+			command = static_cast<mysensors_command_t>(atoi(str));
+			message.setCommand(command);
 			break;
-		case 3: // Should we request ack from destination?
-			mSetRequestAck(message, atoi(str) ? 1 : 0);
+		case 3: // Should we request echo from destination?
+			message.setRequestEcho(atoi(str) ? 1 : 0);
 			break;
 		case 4: // Data type
-			message.type = atoi(str);
-			break;
-		case 5: {// Variable value
-			if (command == C_STREAM) {
-				uint8_t bvalue[MAX_PAYLOAD];
-				uint8_t blen = 0;
-				while (*str) {
-					uint8_t val;
-					val = convertH2I(*str++) << 4;
-					val += convertH2I(*str++);
-					bvalue[blen] = val;
-					blen++;
-				}
-				message.set(bvalue, blen);
-			} else {
-				char *value = str;
-				// Remove trailing carriage return and newline character (if it exists)
-				const uint8_t lastCharacter = strlen(value) - 1;
-				if (value[lastCharacter] == '\r' || value[lastCharacter] == '\n') {
-					value[lastCharacter] = '\0';
-				}
-				message.set(value);
-			}
+			message.setType(atoi(str));
 			break;
 		}
-		}
-		index++;
 	}
-	// Return true if input valid
-	return (index == 6);
+	// payload
+	if (command == C_STREAM) {
+		uint8_t bvalue[MAX_PAYLOAD_SIZE];
+		uint8_t blen = 0;
+		while (*str) {
+			uint8_t val;
+			val = convertH2I(*str++) << 4;
+			val += convertH2I(*str++);
+			bvalue[blen] = val;
+			blen++;
+		}
+		message.set(bvalue, blen);
+	} else {
+		char *value = str;
+		// Remove trailing carriage return and newline character (if it exists)
+		const uint8_t lastCharacter = strlen(value) - 1;
+		if (value[lastCharacter] == '\r' || value[lastCharacter] == '\n') {
+			value[lastCharacter] = '\0';
+		}
+		message.set(value);
+	}
+	return (index == 5);
 }
 
 char *protocolMyMessage2Serial(MyMessage &message)
 {
-	(void)snprintf_P(_fmtBuffer, MY_GATEWAY_MAX_SEND_LENGTH,
-	                 PSTR("%" PRIu8 ";%" PRIu8 ";%" PRIu8 ";%" PRIu8 ";%" PRIu8 ";%s\n"), message.sender,
-	                 message.sensor, mGetCommand(message), mGetAck(message), message.type,
+	(void)snprintf_P(_fmtBuffer, (uint8_t)MY_GATEWAY_MAX_SEND_LENGTH,
+	                 PSTR("%" PRIu8 ";%" PRIu8 ";%" PRIu8 ";%" PRIu8 ";%" PRIu8 ";%s\n"), message.getSender(),
+	                 message.getSensor(), message.getCommand(), message.isEcho(), message.getType(),
 	                 message.getString(_convBuffer));
 	return _fmtBuffer;
 }
 
 char *protocolMyMessage2MQTT(const char *prefix, MyMessage &message)
 {
-	(void)snprintf_P(_fmtBuffer, MY_GATEWAY_MAX_SEND_LENGTH,
+	(void)snprintf_P(_fmtBuffer, (uint8_t)MY_GATEWAY_MAX_SEND_LENGTH,
 	                 PSTR("%s/%" PRIu8 "/%" PRIu8 "/%" PRIu8 "/%" PRIu8 "/%" PRIu8 ""), prefix,
-	                 message.sender, message.sensor, mGetCommand(message), mGetAck(message), message.type);
+	                 message.getSender(), message.getSensor(), message.getCommand(), message.isEcho(),
+	                 message.getType());
 	return _fmtBuffer;
 }
+
 
 bool protocolMQTT2MyMessage(MyMessage &message, char *topic, uint8_t *payload,
                             const unsigned int length)
 {
 	char *str, *p;
 	uint8_t index = 0;
-	message.sender = GATEWAY_ADDRESS;
-	message.last = GATEWAY_ADDRESS;
-	mSetAck(message, false);
+	message.setSender(GATEWAY_ADDRESS);
+	message.setLast(GATEWAY_ADDRESS);
+	message.setEcho(false);
 	for (str = strtok_r(topic + strlen(MY_MQTT_SUBSCRIBE_TOPIC_PREFIX) + 1, "/", &p);
 	        str && index < 5;
-	        str = strtok_r(NULL, "/", &p)
+	        str = strtok_r(NULL, "/", &p), index++
 	    ) {
 		switch (index) {
 		case 0:
 			// Node id
-			message.destination = atoi(str);
+			message.setDestination(atoi(str));
 			break;
 		case 1:
 			// Sensor id
-			message.sensor = atoi(str);
+			message.setSensor(atoi(str));
 			break;
 		case 2: {
 			// Command type
-			const uint8_t command = atoi(str);
-			mSetCommand(message, command);
+			const mysensors_command_t command = static_cast<mysensors_command_t>(atoi(str));
+			message.setCommand(command);
 			// Add payload
 			if (command == C_STREAM) {
-				uint8_t bvalue[MAX_PAYLOAD];
+				uint8_t bvalue[MAX_PAYLOAD_SIZE];
 				uint8_t blen = 0;
 				while (*payload) {
 					uint8_t val;
@@ -150,15 +148,14 @@ bool protocolMQTT2MyMessage(MyMessage &message, char *topic, uint8_t *payload,
 			break;
 		}
 		case 3:
-			// Ack flag
-			mSetRequestAck(message, atoi(str) ? 1 : 0);
+			// Echo flag
+			message.setRequestEcho(atoi(str) ? 1 : 0);
 			break;
 		case 4:
 			// Sub type
-			message.type = atoi(str);
+			message.setType(atoi(str));
 			break;
 		}
-		index++;
 	}
 	// Return true if input valid
 	return (index == 5);

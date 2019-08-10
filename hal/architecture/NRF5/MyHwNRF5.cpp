@@ -21,11 +21,6 @@
  */
 
 #include "MyHwNRF5.h"
-#include <nrf.h>
-
-#define CRYPTO_LITTLE_ENDIAN
-
-#define INVALID_INTERRUPT_NUM (0xFFu)
 
 volatile uint8_t _wokeUpByInterrupt = INVALID_INTERRUPT_NUM; // Interrupt number that woke the mcu.
 volatile uint8_t _wakeUp1Interrupt =
@@ -161,7 +156,7 @@ void hwRandomNumberInit(void)
 		while (NRF_RNG->EVENTS_VALRDY == 0) {
 			yield();
 		}
-		ecbstruct[i] = NRF_RNG->VALUE;
+		*(ecbstruct + i) = NRF_RNG->VALUE;
 		NRF_RNG->EVENTS_VALRDY = 0;
 	}
 	hwRndDataReadPos = 0;
@@ -209,8 +204,8 @@ ssize_t hwGetentropy(void *__buffer, size_t __length)
 					}
 				}
 				hwRndDataReadPos=0;
-				for (uint8_t i=0; i<sizeof(hwRngData.ciphertext); i++) {
-					hwRngData.cleartext[i] ^= hwRngData.ciphertext[i];
+				for (uint8_t pos = 0; pos < sizeof(hwRngData.ciphertext); pos++) {
+					hwRngData.cleartext[pos] ^= hwRngData.ciphertext[pos];
 				}
 			} else
 			{

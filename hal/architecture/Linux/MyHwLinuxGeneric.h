@@ -25,6 +25,15 @@
 #include "SerialPort.h"
 #include "StdInOutStream.h"
 #include <SPI.h>
+#include <errno.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <syscall.h>
+#include <unistd.h>
+#include "SoftEeprom.h"
+#include "log.h"
+#include "config.h"
 
 #define CRYPTO_LITTLE_ENDIAN
 
@@ -45,6 +54,7 @@ StdInOutStream Serial = StdInOutStream();
 // Define these as macros (do nothing)
 #define hwWatchdogReset()
 #define hwReboot()
+#define hwGetSleepRemaining() (0ul)
 
 inline void hwDigitalWrite(uint8_t, uint8_t);
 inline int hwDigitalRead(uint8_t);

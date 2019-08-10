@@ -1,13 +1,12 @@
 #!groovy
 def buildArduino(config, String buildFlags, String sketch, String key) {
-	def root              = '/opt/arduino-1.8.8/'	
+	def root              = '/opt/arduino-1.8.9/'	
 	def build_path        = 'build'
-	def build_path_cmd    = ''
+	def build_path_cmd    = ' -build-path '+build_path+' '
 	if (config.nightly_arduino_ide)
 	{
 		root = '/opt/arduino-nightly/'
-		// patch for arduino-builder 1.8.9
-		build_path_cmd    = ' -build-path '+build_path+' '
+		// patch for nightly arduino-builder
 	}
 	def jenkins_root      = '/var/lib/jenkins/'
 	def builder           = root+'arduino-builder'
@@ -31,7 +30,7 @@ def parseWarnings(String key) {
  		excludePattern: '''.*/EEPROM\\.h,.*/Dns\\.cpp,.*/socket\\.cpp,.*/util\\.h,.*/Servo\\.cpp,
  											 .*/Adafruit_NeoPixel\\.cpp,.*/UIPEthernet.*,.*/SoftwareSerial\\.cpp,
  											 .*/pins_arduino\\.h,.*/Stream\\.cpp,.*/USBCore\\.cpp,.*/Wire\\.cpp,
- 											 .*/hardware/STM32F1.*,.*/hardware/esp8266.*,.*/hardware/espressif/esp32.*,
+ 											 .*/hardware/STM32F1.*,.*/hardware/esp8266.*,.*/hardware/esp32.*,
 											 .*/libraries/SD/.*''',
 
  		healthy: '', includePattern: '', messagesPattern: '',

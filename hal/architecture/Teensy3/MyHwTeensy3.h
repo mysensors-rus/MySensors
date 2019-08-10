@@ -29,11 +29,11 @@
 #define MyHwTeensy3_h
 
 #include <SPI.h>
+#include "util/atomic.h"
 
 #ifdef __cplusplus
 #include <Arduino.h>
 #endif
-#include "util/atomic.h"
 
 #define CRYPTO_LITTLE_ENDIAN
 
@@ -62,6 +62,7 @@
 #define hwDigitalRead(__pin) digitalReadFast(__pin)
 #define hwPinMode(__pin, __value) pinMode(__pin, __value)
 #define hwMillis() millis()
+#define hwGetSleepRemaining() (0ul)
 
 void hwRandomNumberInit(void);
 bool hwInit(void);
